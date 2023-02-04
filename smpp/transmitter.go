@@ -53,7 +53,7 @@ type Transmitter struct {
 	tx struct {
 		count int32
 		sync.Mutex
-		inflight map[string]chan *tx
+		inflight map[uint32]chan *tx
 	}
 }
 
@@ -74,7 +74,7 @@ func (t *Transmitter) Bind() <-chan ConnStatus {
 		return t.cl.Status
 	}
 	t.tx.Lock()
-	t.tx.inflight = make(map[string]chan *tx)
+	t.tx.inflight = make(map[uint32]chan *tx)
 	t.tx.Unlock()
 	c := &client{
 		Addr:               t.Addr,
@@ -119,9 +119,9 @@ func (t *Transmitter) handlePDU(f HandlerFunc) {
 		if err != nil || p == nil {
 			break
 		}
-		key := p.Header().Key()
+		seq := p.Header().Seq
 		t.tx.Lock()
-		rc := t.tx.inflight[key]
+		rc := t.tx.inflight[seq]
 		t.tx.Unlock()
 		if rc != nil {
 			rc <- &tx{PDU: p}
@@ -285,13 +285,13 @@ func (t *Transmitter) do(p pdu.Body) (*tx, error) {
 		}
 	}
 	rc := make(chan *tx, 1)
-	key := p.Header().Key()
+	seq := p.Header().Seq
 	t.tx.Lock()
-	t.tx.inflight[key] = rc
+	t.tx.inflight[seq] = rc
 	t.tx.Unlock()
 	defer func() {
 		t.tx.Lock()
-		delete(t.tx.inflight, key)
+		delete(t.tx.inflight, seq)
 		t.tx.Unlock()
 	}()
 	err := t.cl.Write(p)
@@ -308,6 +308,10 @@ func (t *Transmitter) do(p pdu.Body) (*tx, error) {
 		return nil, ErrTimeout
 	}
 }
+func (t *Transmitter) Replace(sm *ShortMessage, msgid string) (*ShortMessage, error) {
+	p := pdu.NewReplaceSM(sm.TLVFields)
+	return t.replaceMsg(sm, p, uint8(sm.Text.Type()), msgid)
+}
 
 // Submit sends a short message and returns and updates the given
 // sm with the response status. It returns the same sm object.
@@ -320,6 +324,12 @@ func (t *Transmitter) Submit(sm *ShortMessage) (*ShortMessage, error) {
 		p := pdu.NewSubmitMulti(sm.TLVFields)
 		return t.submitMsgMulti(sm, p, uint8(sm.Text.Type()))
 	}
+	p := pdu.NewSubmitSM(sm.TLVFields)
+	return t.submitMsg(sm, p, uint8(sm.Text.Type()))
+}
+
+func (t *Transmitter) Data(sm *ShortMessage) (*ShortMessage, error) {
+
 	p := pdu.NewSubmitSM(sm.TLVFields)
 	return t.submitMsg(sm, p, uint8(sm.Text.Type()))
 }
@@ -404,6 +414,39 @@ func (t *Transmitter) SubmitLongMsg(sm *ShortMessage) ([]ShortMessage, error) {
 		parts = append(parts, *sm)
 	}
 	return parts, nil
+}
+func (t *Transmitter) replaceMsg(sm *ShortMessage, p pdu.Body, dataCoding uint8, msgid string) (*ShortMessage, error) {
+	f := p.Fields()
+	f.Set(pdufield.MessageID, msgid)
+	f.Set(pdufield.SourceAddrTON, sm.SourceAddrTON)
+	f.Set(pdufield.SourceAddrNPI, sm.SourceAddrNPI)
+	f.Set(pdufield.SourceAddr, sm.Src)
+	f.Set(pdufield.ScheduleDeliveryTime, sm.ScheduleDeliveryTime)
+	if sm.Validity != time.Duration(0) {
+		f.Set(pdufield.ValidityPeriod, convertValidity(sm.Validity))
+	}
+	f.Set(pdufield.RegisteredDelivery, uint8(sm.Register))
+
+	f.Set(pdufield.SMDefaultMsgID, sm.SMDefaultMsgID)
+	f.Set(pdufield.ShortMessage, sm.Text)
+
+	resp, err := t.do(p)
+	if err != nil {
+		return nil, err
+	}
+	sm.resp.Lock()
+	sm.resp.p = resp.PDU
+	sm.resp.Unlock()
+	if resp.PDU == nil {
+		return nil, fmt.Errorf("unexpected empty PDU")
+	}
+	if id := resp.PDU.Header().ID; id != pdu.ReplaceSMRespID {
+		return sm, fmt.Errorf("unexpected PDU ID: %s", id)
+	}
+	if s := resp.PDU.Header().Status; s != 0 {
+		return sm, s
+	}
+	return sm, resp.Err
 }
 
 func (t *Transmitter) submitMsg(sm *ShortMessage, p pdu.Body, dataCoding uint8) (*ShortMessage, error) {

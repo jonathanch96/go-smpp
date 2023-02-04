@@ -8,13 +8,12 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"github.com/fiorix/go-smpp/smpp/pdu"
+	"github.com/fiorix/go-smpp/smpp/pdu/pdufield"
 	"io"
 	"log"
 	"net"
 	"sync"
-
-	"github.com/fiorix/go-smpp/smpp/pdu"
-	"github.com/fiorix/go-smpp/smpp/pdu/pdufield"
 )
 
 // Default settings.
@@ -44,25 +43,25 @@ type Server struct {
 
 // NewServer creates and initializes a new Server. Callers are supposed
 // to call Close on that server later.
-func NewServer() *Server {
-	s := NewUnstartedServer()
+func NewServer(hostport string) *Server {
+	s := NewUnstartedServer(hostport)
 	s.Start()
 	return s
 }
 
 // NewUnstartedServer creates a new Server with default settings, and
 // does not start it. Callers are supposed to call Start and Close later.
-func NewUnstartedServer() *Server {
+func NewUnstartedServer(hostport string) *Server {
 	return &Server{
 		User:    DefaultUser,
 		Passwd:  DefaultPasswd,
 		Handler: EchoHandler,
-		l:       newLocalListener(),
+		l:       newLocalListener(hostport),
 	}
 }
 
-func newLocalListener() net.Listener {
-	l, err := net.Listen("tcp", "127.0.0.1:0")
+func newLocalListener(hostport string) net.Listener {
+	l, err := net.Listen("tcp", hostport)
 	if err == nil {
 		return l
 	}
@@ -140,10 +139,13 @@ func (srv *Server) handle(c *conn) {
 // auth authenticate new clients.
 func (srv *Server) auth(c *conn) error {
 	p, err := c.Read()
+	fmt.Println(p.Header().ID)
+
 	if err != nil {
 		return err
 	}
 	var resp pdu.Body
+
 	switch p.Header().ID {
 	case pdu.BindTransmitterID:
 		resp = pdu.NewBindTransmitterResp()
@@ -167,7 +169,7 @@ func (srv *Server) auth(c *conn) error {
 		return errors.New("invalid passwd")
 	}
 	resp.Fields().Set(pdufield.SystemID, DefaultSystemID)
-
+	resp.Header().Seq = p.Header().Seq
 	return c.Write(resp)
 }
 

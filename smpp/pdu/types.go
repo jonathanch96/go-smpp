@@ -54,6 +54,29 @@ func NewGenericNACK() Body {
 	return b
 }
 
+// AlertNotification PDU.
+type AlertNotification struct{ *codec }
+
+func newAlertNotification(hdr *Header) *codec {
+	return &codec{
+		h: hdr,
+		l: pdufield.List{
+			pdufield.SourceAddrTON,
+			pdufield.SourceAddrNPI,
+			pdufield.SourceAddr,
+			pdufield.ESMEAddrTON,
+			pdufield.ESMEAddrNPI,
+			pdufield.ESMEAddr,
+		}}
+}
+
+// NewGenericNACK creates and initializes a GenericNACK PDU.
+func NewAlertNotification() Body {
+	b := newAlertNotification(&Header{ID: AlertNotificationID})
+	b.init()
+	return b
+}
+
 // Bind PDU.
 type Bind struct{ *codec }
 
@@ -123,10 +146,10 @@ func NewBindTransmitterResp() Body {
 	return b
 }
 
-// QuerySM PDU.
-type QuerySM struct{ *codec }
+// ReplaceSM PDU.
+type ReplaceSM struct{ *codec }
 
-func newQuerySM(hdr *Header) *codec {
+func newReplaceSM(hdr *Header) *codec {
 	return &codec{
 		h: hdr,
 		l: pdufield.List{
@@ -134,6 +157,125 @@ func newQuerySM(hdr *Header) *codec {
 			pdufield.SourceAddrTON,
 			pdufield.SourceAddrNPI,
 			pdufield.SourceAddr,
+			pdufield.ScheduleDeliveryTime,
+			pdufield.ValidityPeriod,
+			pdufield.RegisteredDelivery,
+			pdufield.SMDefaultMsgID,
+			pdufield.SMLength,
+			pdufield.ShortMessage,
+		},
+	}
+}
+
+// NewReplaceSm creates and initializes a new ReplaceSm PDU.
+func NewReplaceSM(fields pdutlv.Fields) Body {
+	b := newReplaceSM(&Header{ID: ReplaceSMID})
+	b.init()
+	for tag, value := range fields {
+		b.t.Set(tag, value)
+	}
+	return b
+}
+
+// QuerySMResp PDU.
+type ReplaceSMResp struct{ *codec }
+
+func newReplaceSMResp(hdr *Header) *codec {
+	return &codec{
+		h: hdr,
+		l: pdufield.List{
+			pdufield.MessageID,
+			pdufield.FinalDate,
+			pdufield.MessageState,
+			pdufield.ErrorCode,
+		},
+	}
+}
+
+// NewQuerySMResp creates and initializes a new QuerySMResp PDU.
+func NewReplaceSMResp() Body {
+	b := newReplaceSMResp(&Header{ID: ReplaceSMRespID})
+	b.init()
+	return b
+}
+
+// DataSM PDU
+type DataSM struct{ *codec }
+
+func newDataSM(hdr *Header) *codec {
+	return &codec{
+		h: hdr,
+		l: pdufield.List{
+			pdufield.ServiceType,
+			pdufield.SourceAddrTON,
+			pdufield.SourceAddrNPI,
+			pdufield.SourceAddr,
+			pdufield.DestAddrTON,
+			pdufield.DestAddrNPI,
+			pdufield.DestinationAddr,
+			pdufield.ESMClass,
+			pdufield.RegisteredDelivery,
+			pdufield.DataCoding,
+		},
+	}
+}
+
+func NewDataSm(fields pdutlv.Fields) Body {
+	b := newDataSM(&Header{ID: DataSMID})
+	b.init()
+	for tag, value := range fields {
+		b.t.Set(tag, value)
+	}
+	return b
+}
+
+// DataSMResp PDU.
+type DataSMResp struct{ *codec }
+
+func newDataSMResp(hdr *Header) *codec {
+	return &codec{
+		h: hdr,
+		l: pdufield.List{
+			pdufield.MessageID,
+			pdufield.FinalDate,
+			pdufield.MessageState,
+			pdufield.ErrorCode,
+		},
+	}
+}
+
+// NewQuerySMResp creates and initializes a new QuerySMResp PDU.
+func NewDataSMResp() Body {
+	b := newDataSMResp(&Header{ID: DataSMRespID})
+	b.init()
+	return b
+}
+
+// QuerySM PDU.
+type QuerySM struct{ *codec }
+
+func newQuerySM(hdr *Header) *codec {
+	return &codec{
+		h: hdr,
+		l: pdufield.List{
+			pdufield.ServiceType,
+			pdufield.SourceAddrTON,
+			pdufield.SourceAddrNPI,
+			pdufield.SourceAddr,
+			pdufield.DestAddrTON,
+			pdufield.DestAddrNPI,
+			pdufield.DestinationAddr,
+			pdufield.ESMClass,
+			pdufield.ProtocolID,
+			pdufield.PriorityFlag,
+			pdufield.ScheduleDeliveryTime,
+			pdufield.ValidityPeriod,
+			pdufield.RegisteredDelivery,
+			pdufield.ReplaceIfPresentFlag,
+			pdufield.DataCoding,
+			pdufield.SMDefaultMsgID,
+			pdufield.SMLength,
+			pdufield.ShortMessage,
 		},
 	}
 }
@@ -284,6 +426,25 @@ func NewSubmitMultiResp() Body {
 	return b
 }
 
+// GenericNack PDU.
+type GenericNack struct{ *codec }
+
+func newGenericNack(hdr *Header) *codec {
+	return &codec{
+		h: hdr,
+		l: pdufield.List{
+			pdufield.MessageID,
+			pdufield.NoUnsuccess,
+			pdufield.UnsuccessSme,
+		},
+	}
+}
+func NewGenericNack() Body {
+	b := newGenericNack(&Header{ID: GenericNACKID})
+	b.init()
+	return b
+}
+
 // DeliverSM PDU.
 type DeliverSM struct{ *codec }
 
@@ -308,6 +469,8 @@ func newDeliverSM(hdr *Header) *codec {
 			pdufield.DataCoding,
 			pdufield.SMDefaultMsgID,
 			pdufield.SMLength,
+			pdufield.UDHLength,
+			pdufield.GSMUserData,
 			pdufield.ShortMessage,
 		},
 	}

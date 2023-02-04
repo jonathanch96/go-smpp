@@ -149,9 +149,9 @@ func Decode(r io.Reader) (Body, error) {
 	case CancelSMRespID:
 		// TODO(fiorix): Implement CancelSMResp.
 	case DataSMID:
-		// TODO(fiorix): Implement DataSM.
+		return decodeFields(newDataSM(hdr), b)
 	case DataSMRespID:
-		// TODO(fiorix): Implement DataSMResp.
+		return decodeFields(newDataSMResp(hdr), b)
 	case DeliverSMID:
 		return decodeFields(newDeliverSM(hdr), b)
 	case DeliverSMRespID:
@@ -169,9 +169,9 @@ func Decode(r io.Reader) (Body, error) {
 	case QuerySMRespID:
 		return decodeFields(newQuerySMResp(hdr), b)
 	case ReplaceSMID:
-		// TODO(fiorix): Implement ReplaceSM.
+		return decodeFields(newReplaceSM(hdr), b)
 	case ReplaceSMRespID:
-		// TODO(fiorix): Implement ReplaceSMResp.
+		return decodeFields(newReplaceSMResp(hdr), b)
 	case SubmitMultiID:
 		return decodeFields(newSubmitMulti(hdr), b)
 	case SubmitMultiRespID:
